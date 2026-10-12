@@ -2,7 +2,8 @@ erDiagram
     SUPPLIER ||--o{ SUPPLY_ORDER : "supplies"
     SUPPLY_ORDER ||--|{ SUPPLY_ITEM : "contains"
     PRODUCT ||--o{ SUPPLY_ITEM : "included_in"
-    WAREHOUSE_LOCATION ||--o{ SUPPLY_ITEM : "stores"
+    PRODUCT ||--o{ INVENTORY_STOCK : "has_stock_in"
+    WAREHOUSE_LOCATION ||--o{ INVENTORY_STOCK : "holds_stock"
     PRODUCT ||--o{ INVENTORY_MOVEMENT : "moves"
     WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "source_location"
     WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "target_location"
@@ -29,7 +30,6 @@ erDiagram
         BIGSERIAL id PK
         UUID supply_id FK
         UUID product_id FK
-        UUID location_id FK
         INTEGER quantity
         NUMERIC unit_price
     }
@@ -49,6 +49,13 @@ erDiagram
         VARCHAR(50) zone
         VARCHAR(50) shelf_number
         INTEGER max_capacity
+    }
+
+    INVENTORY_STOCK {
+        BIGSERIAL id PK
+        UUID product_id FK
+        UUID location_id FK
+        INTEGER quantity
     }
 
     INVENTORY_MOVEMENT {

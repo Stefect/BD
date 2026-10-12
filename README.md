@@ -7,7 +7,8 @@
 - Реєстрація накладних надходження (партій)
 - Облік адресної структури складу (зони, стелажі, полиці)
 - Контроль мінімальних залишків та запобігання дефіциту
-- Фіксація внутрішніх переміщень товарів між комірками
+- Оперативний облік залишків у кожній комірці (InventoryStock)
+- Фіксація та аудит внутрішніх переміщень товарів між комірками
 
 ## Бізнес-правила системи
 
@@ -21,11 +22,12 @@
 * **Статусна модель накладної:** Накладна `SupplyOrder` має статус із фіксованого списку: `draft`, `received`, `cancelled`.
 * **Розрахунок вартості:** Поле `total_cost` розраховується автоматично як сума вартості всіх доданих позицій (`quantity * unit_price`).
 
-### Адресне зберігання та переміщення (Warehouse & Movements)
-* **Унікальність локації:** Поєднання полів `zone` та `shelf_number` формує унікальний ідентифікатор фізичної комірки.
-* **Обмеження місткості:** Сумарна кількість одиниць товару, закріплених за коміркою, не може перевищувати `max_capacity`.
+### Адресне зберігання, залишки та переміщення (Warehouse, Stock & Movements)
+* **Унікальність локації:** Поле `location_code` є унікальним кодом адреси, а поєднання полів `zone` та `shelf_number` формує складене обмеження унікальності.
+* **Операційні залишки:** Поточна наявність товару в конкретній комірці зберігається в таблиці `InventoryStock`. Комбінація `(product_id, location_id)` є унікальною.
+* **Обмеження місткості:** Сумарна кількість усіх товарів у комірці (`SUM(quantity)` з `InventoryStock`) не може перевищувати `max_capacity`.
 * **Валідація переміщення:** При створенні запису `InventoryMovement` вихідна локація (`from_location_id`) та кінцева локація (`to_location_id`) не можуть бути ідентичними.
-* **Мінімальний обсяг операцій:** Кількість товару в накладній та в переміщенні повинна бути строго більшою за 0 (`quantity > 0`).
+* **Мінімальний обсяг операцій:** Кількість товару в накладній, залишках та переміщенні повинна бути строго більшою за 0 (`quantity > 0`).
 
 ---
 
@@ -36,7 +38,8 @@ erDiagram
     SUPPLIER ||--o{ SUPPLY_ORDER : "supplies"
     SUPPLY_ORDER ||--|{ SUPPLY_ITEM : "contains"
     PRODUCT ||--o{ SUPPLY_ITEM : "included_in"
-    WAREHOUSE_LOCATION ||--o{ SUPPLY_ITEM : "stores"
+    PRODUCT ||--o{ INVENTORY_STOCK : "has_stock_in"
+    WAREHOUSE_LOCATION ||--o{ INVENTORY_STOCK : "holds_stock"
     PRODUCT ||--o{ INVENTORY_MOVEMENT : "moves"
     WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "source_location"
     WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "target_location"
@@ -63,7 +66,6 @@ erDiagram
         BIGSERIAL id PK
         UUID supply_id FK
         UUID product_id FK
-        UUID location_id FK
         INTEGER quantity
         NUMERIC unit_price
     }
@@ -83,6 +85,13 @@ erDiagram
         VARCHAR(50) zone
         VARCHAR(50) shelf_number
         INTEGER max_capacity
+    }
+
+    INVENTORY_STOCK {
+        BIGSERIAL id PK
+        UUID product_id FK
+        UUID location_id FK
+        INTEGER quantity
     }
 
     INVENTORY_MOVEMENT {
