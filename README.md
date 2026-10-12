@@ -1,33 +1,33 @@
 # Logistics - Система адресного складського обліку та логістики
 
-## Вимоги
+Система управління складом (WMS) призначена для контролю надходження, адресного зберігання товарів у комірках та фіксації внутрішніх переміщень.
 
-- Ведення номенклатурного довідника товарів
+## Основний функціонал
+
+- Ведення номенклатурного довідника товарів та їхніх параметрів
 - Облік контактних даних постачальників
 - Реєстрація накладних надходження (партій)
-- Облік адресної структури складу (зони, стелажі, полиці)
+- Облік адресної структури складу (зони, стелажі, комірки)
 - Контроль мінімальних залишків та запобігання дефіциту
-- Оперативний облік залишків у кожній комірці (InventoryStock)
-- Фіксація та аудит внутрішніх переміщень товарів між комірками
+- Оперативний облік поточних залишків у кожній комірці (`inventory_stock`)
+- Аудит та фіксація внутрішніх переміщень товарів між комірками або списання
 
 ## Бізнес-правила системи
 
-### Товари та номенклатура (Products)
-* **Унікальність артикулу:** Кожен товар повинен мати глобально унікальний артикул (`sku_code`).
-* **Одиниці вимірювання:** Значення `unit` визначається з переліку (`piece`, `kg`, `liter`, `box`, `pallet`).
-* **Контроль дефіциту:** Значення `min_stock_level` не може бути меншим за 0. Якщо сумарний залишок товару на всіх локаціях стає меншим або рівним `min_stock_level`, система маркує позицію як критичну.
+### 1. Товари та номенклатура (`product`)
+- **Унікальність артикулу:** Кожен товар має унікальний артикул (`sku_code`).
+- **Одиниці вимірювання:** За замовчуванням `unit = 'piece'`.
+- **Контроль дефіциту:** Значення `min_stock_level >= 0`.
 
-### Постачальники та накладні (Suppliers & Supply Orders)
-* **Унікальність контактів:** Поле `email` та код компанії постачальника є унікальними в системі.
-* **Статусна модель накладної:** Накладна `SupplyOrder` має статус із фіксованого списку: `draft`, `received`, `cancelled`.
-* **Розрахунок вартості:** Поле `total_cost` розраховується автоматично як сума вартості всіх доданих позицій (`quantity * unit_price`).
+### 2. Постачальники та накладні (`supplier`, `supply_order`, `supply_item`)
+- **Унікальність контактів:** Поле `email` є унікальним для кожного постачальника.
+- **Статусна модель:** Накладна `supply_order` має статус: `draft`, `received` або `cancelled`.
+- **Фіксація цін:** У `supply_item` зберігається закуплена кількість та ціна на момент приходу.
 
-### Адресне зберігання, залишки та переміщення (Warehouse, Stock & Movements)
-* **Унікальність локації:** Поле `location_code` є унікальним кодом адреси, а поєднання полів `zone` та `shelf_number` формує складене обмеження унікальності.
-* **Операційні залишки:** Поточна наявність товару в конкретній комірці зберігається в таблиці `InventoryStock`. Комбінація `(product_id, location_id)` є унікальною.
-* **Обмеження місткості:** Сумарна кількість усіх товарів у комірці (`SUM(quantity)` з `InventoryStock`) не може перевищувати `max_capacity`.
-* **Валідація переміщення:** При створенні запису `InventoryMovement` вихідна локація (`from_location_id`) та кінцева локація (`to_location_id`) не можуть бути ідентичними.
-* **Мінімальний обсяг операцій:** Кількість товару в накладній, залишках та переміщенні повинна бути строго більшою за 0 (`quantity > 0`).
+### 3. Адресне зберігання та переміщення (`warehouse_location`, `inventory_stock`, `inventory_movement`)
+- **Унікальність комірки:** Поле `location_code` є унікальним, а поєднання `(zone, shelf_number)` формує складене обмеження унікальності.
+- **Оперативні залишки:** Поточна наявність товару в комірці зберігається в таблиці `inventory_stock`. Пара `(product_id, location_id)` є унікальною.
+- **Валідація переміщення:** Переміщення товару в ту саму комірку заборонено (`from_location_id IS DISTINCT FROM to_location_id`).
 
 ---
 
@@ -45,60 +45,60 @@ erDiagram
     WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "target_location"
 
     SUPPLIER {
-        UUID id PK
-        TEXT company_name
-        TEXT contact_person
-        TEXT phone
-        TEXT email UK
+        INT supplier_id PK
+        VARCHAR company_name
+        VARCHAR contact_person
+        VARCHAR phone
+        VARCHAR email UK
         TEXT address
     }
 
-    SUPPLY_ORDER {
-        UUID id PK
-        TEXT order_number UK
-        UUID supplier_id FK
-        TIMESTAMP supply_date
-        NUMERIC total_cost
-        ENUM status "draft/received/cancelled"
-    }
-
-    SUPPLY_ITEM {
-        BIGSERIAL id PK
-        UUID supply_id FK
-        UUID product_id FK
-        INTEGER quantity
-        NUMERIC unit_price
-    }
-
     PRODUCT {
-        UUID id PK
-        VARCHAR(50) sku_code UK
-        VARCHAR(150) name
+        INT product_id PK
+        VARCHAR sku_code UK
+        VARCHAR name
         TEXT description
-        ENUM unit "piece/kg/liter/box/pallet"
-        INTEGER min_stock_level
+        VARCHAR unit
+        INT min_stock_level
     }
 
     WAREHOUSE_LOCATION {
-        UUID id PK
-        VARCHAR(50) location_code UK
-        VARCHAR(50) zone
-        VARCHAR(50) shelf_number
-        INTEGER max_capacity
+        INT location_id PK
+        VARCHAR location_code UK
+        VARCHAR zone
+        VARCHAR shelf_number
+        INT max_capacity
+    }
+
+    SUPPLY_ORDER {
+        INT order_id PK
+        VARCHAR order_number UK
+        INT supplier_id FK
+        TIMESTAMP supply_date
+        NUMERIC total_cost
+        VARCHAR status
+    }
+
+    SUPPLY_ITEM {
+        INT item_id PK
+        INT order_id FK
+        INT product_id FK
+        INT quantity
+        NUMERIC unit_price
     }
 
     INVENTORY_STOCK {
-        BIGSERIAL id PK
-        UUID product_id FK
-        UUID location_id FK
-        INTEGER quantity
+        INT stock_id PK
+        INT product_id FK
+        INT location_id FK
+        INT quantity
     }
 
     INVENTORY_MOVEMENT {
-        BIGSERIAL id PK
-        UUID product_id FK
-        UUID from_location_id FK
-        UUID to_location_id FK
-        INTEGER quantity
+        INT movement_id PK
+        INT product_id FK
+        INT from_location_id FK
+        INT to_location_id FK
+        INT quantity
         TIMESTAMP movement_date
     }
