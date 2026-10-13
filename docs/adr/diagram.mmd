@@ -1,68 +1,75 @@
 erDiagram
-    SUPPLIER ||--o{ SUPPLY_ORDER : "supplies"
-    SUPPLY_ORDER ||--|{ SUPPLY_ITEM : "contains"
+    SUPPLIER ||--o{ SUPPLY_ORDER : "supplies (накладна створюється з постачальником)"
+    SUPPLY_ORDER ||--o{ SUPPLY_ITEM : "contains (0..N; отримана накладна має 1..N)"
     PRODUCT ||--o{ SUPPLY_ITEM : "included_in"
+    WAREHOUSE_LOCATION ||--o{ SUPPLY_ITEM : "receiving_location (планова комірка приймання)"
     PRODUCT ||--o{ INVENTORY_STOCK : "has_stock_in"
     WAREHOUSE_LOCATION ||--o{ INVENTORY_STOCK : "holds_stock"
     PRODUCT ||--o{ INVENTORY_MOVEMENT : "moves"
-    WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "source_location"
-    WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "target_location"
+    WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "source_location (обов'язкова)"
+    WAREHOUSE_LOCATION |o--o{ INVENTORY_MOVEMENT : "target_location (порожня при списанні)"
 
     SUPPLIER {
-        UUID id PK
-        TEXT company_name
-        TEXT contact_person
-        TEXT phone
-        TEXT email UK
-        TEXT address
-    }
-
-    SUPPLY_ORDER {
-        UUID id PK
-        TEXT order_number UK
-        UUID supplier_id FK
-        TIMESTAMP supply_date
-        NUMERIC total_cost
-        ENUM status "draft/received/cancelled"
-    }
-
-    SUPPLY_ITEM {
-        BIGSERIAL id PK
-        UUID supply_id FK
-        UUID product_id FK
-        INTEGER quantity
-        NUMERIC unit_price
+        INT supplier_id PK "IDENTITY"
+        VARCHAR_100 company_name "NOT NULL"
+        VARCHAR_100 contact_person "NOT NULL"
+        VARCHAR_20 phone "NOT NULL, CHECK формат +380..."
+        VARCHAR_100 email "NOT NULL, UNIQUE без урахування регістру"
+        TEXT address "NOT NULL"
     }
 
     PRODUCT {
-        UUID id PK
-        VARCHAR(50) sku_code UK
-        VARCHAR(150) name
+        INT product_id PK "IDENTITY"
+        VARCHAR_50 sku_code UK "NOT NULL, CHECK A-Z 0-9 -"
+        VARCHAR_100 name "NOT NULL"
         TEXT description
-        ENUM unit "piece/kg/liter/box/pallet"
-        INTEGER min_stock_level
+        VARCHAR_20 unit "DEFAULT piece, CHECK piece/kg/liter/box/pallet"
+        INT min_stock_level "DEFAULT 0, CHECK >= 0"
     }
 
     WAREHOUSE_LOCATION {
-        UUID id PK
-        VARCHAR(50) location_code UK
-        VARCHAR(50) zone
-        VARCHAR(50) shelf_number
-        INTEGER max_capacity
+        INT location_id PK "IDENTITY"
+        VARCHAR_50 location_code UK "NOT NULL, CHECK LOC-x-n"
+        VARCHAR_50 zone "NOT NULL, UK (zone, shelf_number)"
+        VARCHAR_50 shelf_number "NOT NULL, UK (zone, shelf_number)"
+        INT max_capacity "NOT NULL, CHECK > 0"
+    }
+
+    SUPPLY_ORDER {
+        INT order_id PK "IDENTITY"
+        VARCHAR_50 order_number UK "NOT NULL"
+        INT supplier_id FK "NOT NULL, ON DELETE RESTRICT"
+        TIMESTAMPTZ supply_date "NOT NULL, DEFAULT now()"
+        NUMERIC_10_2 total_cost "DEFAULT 0, CHECK >= 0, тригер = сума позицій"
+        VARCHAR_20 status "DEFAULT draft, draft/received/cancelled, тригер переходів"
+        TIMESTAMPTZ created_at "NOT NULL, DEFAULT now()"
+        VARCHAR_100 created_by "NOT NULL, DEFAULT current_user"
+    }
+
+    SUPPLY_ITEM {
+        INT order_id PK "FK, ON DELETE CASCADE"
+        INT product_id PK "FK, ON DELETE RESTRICT"
+        INT location_id FK "NOT NULL, ON DELETE RESTRICT"
+        INT quantity "NOT NULL, CHECK > 0"
+        NUMERIC_10_2 unit_price "NOT NULL, CHECK >= 0"
+        VARCHAR_50 batch_number "NOT NULL"
+        DATE expiry_date "NULL допустимо"
     }
 
     INVENTORY_STOCK {
-        BIGSERIAL id PK
-        UUID product_id FK
-        UUID location_id FK
-        INTEGER quantity
+        INT product_id PK "FK, ON DELETE RESTRICT"
+        INT location_id PK "FK, ON DELETE RESTRICT"
+        INT quantity "NOT NULL, CHECK >= 0, змінює тригер"
     }
 
     INVENTORY_MOVEMENT {
-        BIGSERIAL id PK
-        UUID product_id FK
-        UUID from_location_id FK
-        UUID to_location_id FK
-        INTEGER quantity
-        TIMESTAMP movement_date
+        INT movement_id PK "IDENTITY"
+        VARCHAR_20 movement_type "NOT NULL, transfer/write_off"
+        INT product_id FK "NOT NULL, ON DELETE RESTRICT"
+        INT from_location_id FK "NOT NULL, ON DELETE RESTRICT"
+        INT to_location_id FK "NULL тільки для write_off, ON DELETE RESTRICT"
+        INT quantity "NOT NULL, CHECK > 0"
+        VARCHAR_255 reason "NULL допустимо"
+        TIMESTAMPTZ movement_date "NOT NULL, DEFAULT now()"
+        VARCHAR_100 created_by "NOT NULL, DEFAULT current_user"
     }

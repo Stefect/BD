@@ -4,101 +4,45 @@
 
 ## Основний функціонал
 
-- Ведення номенклатурного довідника товарів та їхніх параметрів
-- Облік контактних даних постачальників
-- Реєстрація накладних надходження (партій)
-- Облік адресної структури складу (зони, стелажі, комірки)
-- Контроль мінімальних залишків та запобігання дефіциту
-- Оперативний облік поточних залишків у кожній комірці (`inventory_stock`)
-- Аудит та фіксація внутрішніх переміщень товарів між комірками або списання
+- Ведення номенклатурного довідника товарів та їхніх параметрів (R-01)
+- Облік контактних даних постачальників (R-02)
+- Реєстрація накладних надходження з позиціями, партіями і оприбуткуванням (R-04, R-05, R-06)
+- Облік адресної структури складу (зони, стелажі, комірки) з контролем місткості (R-03)
+- Контроль мінімальних залишків та запобігання дефіциту (R-11)
+- Оперативний облік поточних залишків у кожній комірці (R-07)
+- Аудит та фіксація внутрішніх переміщень товарів між комірками або списання (R-08, R-09, R-10)
 
-## Бізнес-правила системи
+Повний перелік вимог з ідентифікаторами, матриця трасованості, статусна модель та граничні випадки: `docs/adr/spec.md`.
+
+## Бізнес-правила (коротко)
 
 ### 1. Товари та номенклатура (`product`)
-- **Унікальність артикулу:** Кожен товар має унікальний артикул (`sku_code`).
-- **Одиниці вимірювання:** За замовчуванням `unit = 'piece'`.
-- **Контроль дефіциту:** Значення `min_stock_level >= 0`.
+- **R-01.** Артикул `sku_code` унікальний і складається з великих літер, цифр і дефісів. Одиниця виміру `unit` належить до списку piece, kg, liter, box, pallet (за замовчуванням piece). `min_stock_level >= 0`.
 
 ### 2. Постачальники та накладні (`supplier`, `supply_order`, `supply_item`)
-- **Унікальність контактів:** Поле `email` є унікальним для кожного постачальника.
-- **Статусна модель:** Накладна `supply_order` має статус: `draft`, `received` або `cancelled`.
-- **Фіксація цін:** У `supply_item` зберігається закуплена кількість та ціна на момент приходу.
+- **R-02.** Email унікальний без урахування регістру. Телефон у форматі `+` і 10-15 цифр.
+- **R-04.** Накладна створюється в статусі `draft`. Переходи: `draft` в `received` (оприбуткування, потрібна хоча б одна позиція) або `draft` в `cancelled`. Статуси `received` і `cancelled` фінальні. Позиції змінюються і накладна видаляється лише в статусі `draft`.
+- **R-05.** Позиція фіксує товар, комірку приймання, кількість, ціну, партію і термін придатності. Сума накладної (`total_cost`) дорівнює сумі позицій і оновлюється автоматично.
+- **R-06.** При переході в `received` залишки товарів збільшуються в комірках приймання.
 
 ### 3. Адресне зберігання та переміщення (`warehouse_location`, `inventory_stock`, `inventory_movement`)
-- **Унікальність комірки:** Поле `location_code` є унікальним, а поєднання `(zone, shelf_number)` формує складене обмеження унікальності.
-- **Оперативні залишки:** Поточна наявність товару в комірці зберігається в таблиці `inventory_stock`. Пара `(product_id, location_id)` є унікальною.
-- **Валідація переміщення:** Переміщення товару в ту саму комірку заборонено (`from_location_id IS DISTINCT FROM to_location_id`).
+- **R-03.** Код комірки `location_code` унікальний, пара `(zone, shelf_number)` унікальна. Загальний залишок у комірці не перевищує `max_capacity`.
+- **R-07.** Залишок у кожній комірці невід'ємний і змінюється тільки тригерами.
+- **R-08.** Переміщення `transfer` між різними комірками. Залишок у комірці-відправнику має бути достатнім.
+- **R-09.** Списання `write_off` без комірки-отримувача.
+- **R-10.** Кожна операція переміщення має автора (`created_by`), час (`movement_date`) і причину (`reason`). Записи не можна змінювати або видаляти.
 
----
+## Структура документації
 
-## Концептуальна ER-діаграма
+| Файл | Зміст |
+|---|---|
+| `README.md` | Опис системи і коротке зведення правил |
+| `docs/adr/spec.md` | Вимоги R-01..R-13, трасованість, статусна модель, граничні випадки, обмеження |
+| `docs/adr/diagram.mmd` | ER-діаграма (єдине джерело моделі) |
+| `docs/adr/schema.sql` | DDL, тригери, представлення, тестові дані, перевірки |
+| `docs/adr/tests.sql` | Тести бізнес-правил (негативні і позитивні) |
+| `docs/adr/0001-database-design-decisions.md` | ADR: сурогатні ключі, склад таблиць |
+| `docs/adr/0002-*.md` | ADR: складені ключі сполучень, логіка залишків тригерами |
+| `docs/lab2_report.docx` | Звіт лабораторної роботи 2 |
 
-```mermaid
-erDiagram
-    SUPPLIER ||--o{ SUPPLY_ORDER : "supplies"
-    SUPPLY_ORDER ||--|{ SUPPLY_ITEM : "contains"
-    PRODUCT ||--o{ SUPPLY_ITEM : "included_in"
-    PRODUCT ||--o{ INVENTORY_STOCK : "has_stock_in"
-    WAREHOUSE_LOCATION ||--o{ INVENTORY_STOCK : "holds_stock"
-    PRODUCT ||--o{ INVENTORY_MOVEMENT : "moves"
-    WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "source_location"
-    WAREHOUSE_LOCATION ||--o{ INVENTORY_MOVEMENT : "target_location"
-
-    SUPPLIER {
-        INT supplier_id PK
-        VARCHAR company_name
-        VARCHAR contact_person
-        VARCHAR phone
-        VARCHAR email UK
-        TEXT address
-    }
-
-    PRODUCT {
-        INT product_id PK
-        VARCHAR sku_code UK
-        VARCHAR name
-        TEXT description
-        VARCHAR unit
-        INT min_stock_level
-    }
-
-    WAREHOUSE_LOCATION {
-        INT location_id PK
-        VARCHAR location_code UK
-        VARCHAR zone
-        VARCHAR shelf_number
-        INT max_capacity
-    }
-
-    SUPPLY_ORDER {
-        INT order_id PK
-        VARCHAR order_number UK
-        INT supplier_id FK
-        TIMESTAMP supply_date
-        NUMERIC total_cost
-        VARCHAR status
-    }
-
-    SUPPLY_ITEM {
-        INT item_id PK
-        INT order_id FK
-        INT product_id FK
-        INT quantity
-        NUMERIC unit_price
-    }
-
-    INVENTORY_STOCK {
-        INT stock_id PK
-        INT product_id FK
-        INT location_id FK
-        INT quantity
-    }
-
-    INVENTORY_MOVEMENT {
-        INT movement_id PK
-        INT product_id FK
-        INT from_location_id FK
-        INT to_location_id FK
-        INT quantity
-        TIMESTAMP movement_date
-    }
+ER-діаграма: `docs/adr/diagram.mmd` (Mermaid, відкривається в будь-якому переглядачі Mermaid).
