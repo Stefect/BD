@@ -4,15 +4,14 @@
 -- Конструкції: лекції 5 (JOIN, операції над множинами), 6 (агрегація, GROUP BY, HAVING, віконні функції), 7 (підзапити, CTE).
 -- Запуск: psql -U postgres -d logistics -f docs/lab4/lab4_olap.sql
 
--- 0. Перевірка наявності даних (має бути 6 постачальників, 7 товарів, 6 комірок, 5 накладних, 8 позицій, 12 залишків, 7 переміщень)
-SELECT 'supplier' AS tbl, count(*) AS rows FROM supplier
-UNION ALL SELECT 'product', count(*) FROM product
-UNION ALL SELECT 'warehouse_location', count(*) FROM warehouse_location
-UNION ALL SELECT 'supply_order', count(*) FROM supply_order
-UNION ALL SELECT 'supply_item', count(*) FROM supply_item
-UNION ALL SELECT 'inventory_stock', count(*) FROM inventory_stock
-UNION ALL SELECT 'inventory_movement', count(*) FROM inventory_movement
-ORDER BY tbl;
+-- 0. Перевірка наявності даних (кількість записів у таблицях)
+SELECT COUNT(*) AS suppliers FROM supplier;
+SELECT COUNT(*) AS products FROM product;
+SELECT COUNT(*) AS locations FROM warehouse_location;
+SELECT COUNT(*) AS orders FROM supply_order;
+SELECT COUNT(*) AS order_items FROM supply_item;
+SELECT COUNT(*) AS stock_rows FROM inventory_stock;
+SELECT COUNT(*) AS movements FROM inventory_movement;
 
 -- 1. Базова агрегація (одна таблиця)
 
