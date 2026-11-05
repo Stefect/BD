@@ -77,28 +77,29 @@ FROM inventory_movement
 GROUP BY movement_type, created_by
 ORDER BY movement_type, created_by;
 
--- 2.5 Середня ціна постачання і обсяг за товаром (лише позиції отриманих накладних)
+-- 2.5 Середня ціна постачання і обсяг за товаром (усі товари; враховуються лише позиції отриманих накладних)
 SELECT p.sku_code,
        ROUND(AVG(si.unit_price), 2) AS avg_unit_price,
-       SUM(si.quantity) AS total_qty
-FROM supply_item si
-JOIN product p ON p.product_id = si.product_id
-JOIN supply_order o ON o.order_id = si.order_id
-WHERE o.status = 'received'
+       COALESCE(SUM(si.quantity), 0) AS total_qty
+FROM product p
+LEFT JOIN (supply_item si
+           JOIN supply_order o ON o.order_id = si.order_id
+                             AND o.status = 'received')
+  ON si.product_id = p.product_id
 GROUP BY p.sku_code
-ORDER BY avg_unit_price DESC;
+ORDER BY avg_unit_price DESC NULLS LAST;
 
 -- 3. Фільтрація груп (HAVING)
 
 -- 3.1 Комірки, у яких сумарний залишок перевищує 100 одиниць
 SELECT w.location_code,
        w.zone,
-       COALESCE(SUM(s.quantity), 0) AS total_qty,
+       SUM(s.quantity) AS total_qty,
        w.max_capacity
 FROM warehouse_location w
-LEFT JOIN inventory_stock s ON s.location_id = w.location_id
+JOIN inventory_stock s ON s.location_id = w.location_id
 GROUP BY w.location_id, w.location_code, w.zone, w.max_capacity
-HAVING COALESCE(SUM(s.quantity), 0) > 100
+HAVING SUM(s.quantity) > 100
 ORDER BY total_qty DESC;
 
 -- 3.2 Постачальники, у яких сума отриманих накладних перевищує 30000
@@ -228,7 +229,7 @@ WHERE NOT EXISTS (
 )
 ORDER BY p.sku_code;
 
--- 5.5 Корельований підзапит у HAVING: товари з залишком нижче середнього залишку по товарах
+-- 5.5 Підзапит у HAVING: товари з залишком нижче середнього залишку по товарах
 SELECT p.sku_code,
        COALESCE(SUM(s.quantity), 0) AS total_qty
 FROM product p
