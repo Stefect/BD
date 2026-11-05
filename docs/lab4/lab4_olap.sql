@@ -49,7 +49,7 @@ SELECT p.sku_code,
        COALESCE(SUM(s.quantity), 0) AS total_qty
 FROM product p
 LEFT JOIN inventory_stock s ON s.product_id = p.product_id
-GROUP BY p.product_id, p.sku_code, p.name
+GROUP BY p.product_id
 ORDER BY total_qty DESC, p.sku_code;
 
 -- 2.2 Кількість комірок і сумарна місткість за зонами
@@ -86,7 +86,7 @@ LEFT JOIN (supply_item si
            JOIN supply_order o ON o.order_id = si.order_id
                              AND o.status = 'received')
   ON si.product_id = p.product_id
-GROUP BY p.sku_code
+GROUP BY p.product_id
 ORDER BY avg_unit_price DESC NULLS LAST;
 
 -- 3. Фільтрація груп (HAVING)
@@ -98,7 +98,7 @@ SELECT w.location_code,
        w.max_capacity
 FROM warehouse_location w
 JOIN inventory_stock s ON s.location_id = w.location_id
-GROUP BY w.location_id, w.location_code, w.zone, w.max_capacity
+GROUP BY w.location_id
 HAVING SUM(s.quantity) > 100
 ORDER BY total_qty DESC;
 
@@ -109,7 +109,7 @@ SELECT s.company_name,
 FROM supplier s
 JOIN supply_order o ON o.supplier_id = s.supplier_id
 WHERE o.status = 'received'
-GROUP BY s.supplier_id, s.company_name
+GROUP BY s.supplier_id
 HAVING SUM(o.total_cost) > 30000
 ORDER BY total_value DESC;
 
@@ -118,7 +118,7 @@ SELECT p.sku_code,
        COUNT(s.location_id) AS locations_with_stock
 FROM product p
 JOIN inventory_stock s ON s.product_id = p.product_id
-GROUP BY p.product_id, p.sku_code
+GROUP BY p.product_id
 HAVING COUNT(s.location_id) > 1
 ORDER BY locations_with_stock DESC, p.sku_code;
 
@@ -139,7 +139,7 @@ SELECT s.company_name,
        COALESCE(SUM(o.total_cost), 0) AS total_value
 FROM supplier s
 LEFT JOIN supply_order o ON o.supplier_id = s.supplier_id
-GROUP BY s.supplier_id, s.company_name
+GROUP BY s.supplier_id
 ORDER BY s.company_name;
 
 -- 4.3 RIGHT JOIN: усі комірки, навіть ті, куди не було приймання по накладних
@@ -152,7 +152,7 @@ RIGHT JOIN warehouse_location w ON w.location_id = si.location_id
 ORDER BY w.location_code, si.order_id, si.product_id;
 
 -- 4.4 FULL OUTER JOIN: товари із залишками та товари з рухами (щоб знайти товари без рухів)
-SELECT COALESCE(st.product_id, mv.product_id) AS product_id,
+SELECT product_id,
        p.sku_code,
        COALESCE(st.stock_qty, 0) AS stock_qty,
        COALESCE(mv.moved_qty, 0) AS moved_qty
@@ -162,8 +162,8 @@ FROM (SELECT product_id, SUM(quantity) AS stock_qty
 FULL OUTER JOIN (SELECT product_id, SUM(quantity) AS moved_qty
                  FROM inventory_movement
                  GROUP BY product_id) AS mv
-  ON mv.product_id = st.product_id
-LEFT JOIN product p ON p.product_id = COALESCE(st.product_id, mv.product_id)
+  USING (product_id)
+LEFT JOIN product p USING (product_id)
 ORDER BY product_id;
 
 -- 4.5 CROSS JOIN + NOT EXISTS: пари (товар, комірка), для яких ще немає залишку
@@ -188,7 +188,7 @@ SELECT p.sku_code,
              (SELECT SUM(quantity) FROM inventory_stock), 2) AS pct_of_total
 FROM product p
 LEFT JOIN inventory_stock s ON s.product_id = p.product_id
-GROUP BY p.product_id, p.sku_code
+GROUP BY p.product_id
 ORDER BY stock_qty DESC;
 
 -- 5.2 Підзапит-стовпець у WHERE (IN): товари, що постачались у скасованих накладних
@@ -213,7 +213,7 @@ FROM (
            COUNT(s.location_id) AS locations_with_stock
     FROM product p
     LEFT JOIN inventory_stock s ON s.product_id = p.product_id
-    GROUP BY p.product_id, p.sku_code
+    GROUP BY p.product_id
 ) AS t
 WHERE t.locations_with_stock > 1
 ORDER BY t.avg_qty_per_location DESC;
@@ -234,7 +234,7 @@ SELECT p.sku_code,
        COALESCE(SUM(s.quantity), 0) AS total_qty
 FROM product p
 LEFT JOIN inventory_stock s ON s.product_id = p.product_id
-GROUP BY p.product_id, p.sku_code
+GROUP BY p.product_id
 HAVING COALESCE(SUM(s.quantity), 0) < (
     SELECT AVG(prod_total)
     FROM (
@@ -257,7 +257,7 @@ SELECT s.company_name,
 FROM supplier s
 JOIN supply_order o ON o.supplier_id = s.supplier_id AND o.status = 'received'
 JOIN supply_item si ON si.order_id = o.order_id
-GROUP BY s.supplier_id, s.company_name
+GROUP BY s.supplier_id
 ORDER BY total_value DESC;
 
 -- 6.2 Вартість прийнятих постачань за коміркою приймання
@@ -269,7 +269,7 @@ SELECT w.location_code,
 FROM warehouse_location w
 JOIN supply_item si ON si.location_id = w.location_id
 JOIN supply_order o ON o.order_id = si.order_id AND o.status = 'received'
-GROUP BY w.location_id, w.location_code, w.zone
+GROUP BY w.location_id
 ORDER BY total_value DESC;
 
 -- 6.3 Обсяг рухів за коміркою-відправником і типом руху
@@ -279,7 +279,7 @@ SELECT w.location_code AS from_location,
        SUM(m.quantity) AS total_qty
 FROM inventory_movement m
 JOIN warehouse_location w ON w.location_id = m.from_location_id
-GROUP BY w.location_code, m.movement_type
+GROUP BY w.location_id, m.movement_type
 ORDER BY w.location_code, m.movement_type;
 
 -- 7. Віконні функції (лекція 6)
@@ -290,5 +290,5 @@ SELECT p.sku_code,
        DENSE_RANK() OVER (ORDER BY COALESCE(SUM(s.quantity), 0) DESC) AS rnk
 FROM product p
 LEFT JOIN inventory_stock s ON s.product_id = p.product_id
-GROUP BY p.product_id, p.sku_code
+GROUP BY p.product_id
 ORDER BY rnk, p.sku_code;
