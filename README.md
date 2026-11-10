@@ -48,6 +48,8 @@
 | `docs/lab3/lab3_report.md` | Звіт лабораторної роботи 3 (OLTP) |
 | `docs/lab3/lab3_oltp.sql` | SQL-скрипт лабораторної роботи 3 |
 | `docs/lab4/lab4_report.md` | Звіт лабораторної роботи 4 (OLAP) |
+| `docs/lab4_report.docx` | Звіт лабораторної роботи 4 (OLAP, DOCX) |
+| `docs/lab4/lab4_demo_guide.docx` | Демонстраційний посібник до лабораторної роботи 4 |
 | `docs/lab4/lab4_olap.sql` | SQL-скрипт лабораторної роботи 4 |
 | `docs/lab3/lab3_demo_guide.docx` | Демонстраційний посібник до лабораторної роботи 3 |
 
