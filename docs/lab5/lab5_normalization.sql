@@ -34,11 +34,13 @@ GROUP BY order_id
 HAVING COUNT(DISTINCT batch_number) > 1;
 
 -- 6. supply_item: batch_number -> expiry_date (перевірка транзитивної залежності)
+--    COUNT(DISTINCT ...) ігнорує NULL, тому NULL замінюємо умовною датою.
 --    Непорожній результат = одна партія має різні терміни, тобто залежності немає.
-SELECT batch_number, COUNT(DISTINCT expiry_date) AS expiry_variants
+SELECT batch_number,
+       COUNT(DISTINCT COALESCE(expiry_date, '1900-01-01')) AS expiry_variants
 FROM supply_item
 GROUP BY batch_number
-HAVING COUNT(DISTINCT expiry_date) > 1;
+HAVING COUNT(DISTINCT COALESCE(expiry_date, '1900-01-01')) > 1;
 
 -- 7. supply_item: (order_id, product_id) -> PK (складений ключ забезпечує унікальність)
 SELECT order_id, product_id, COUNT(*) AS cnt
