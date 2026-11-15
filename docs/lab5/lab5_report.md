@@ -1,119 +1,116 @@
 # Лабораторна робота 5: Нормалізація бази даних
 
 **База:** `logistics` (схема лабораторної 2, `docs/adr/schema.sql`)
-**Скрипти:** `docs/lab5/lab5_normalization.sql` (перевірка функціональних залежностей), `docs/lab5/migration_batch_to_order.sql` (фінальна декомпозиція)
+**Скрипти:** `docs/lab5/lab5_normalization.sql` (перевірка функціональних залежностей), `docs/lab5/migration_batch_to_order.sql` (міграція зі схеми лаби 2), `docs/lab5/lab5_schema_3nf.sql` (фінальна схема: DROP і CREATE)
+**Діаграма:** `docs/lab5/diagram_3nf.mmd` (код), `docs/lab5/diagram_3nf.png` (зображення)
 **Попередні роботи:** `docs/lab2_report.docx`, `docs/adr/spec.md`, `docs/lab3/lab3_report.md`
 
 ## 1. Мета
 
-Пройти всі три кроки нормалізації (1НФ, 2НФ, 3НФ) для даних постачань `logistics`: від ненормалізованої накладної до схеми лабораторної 2 і її уточнення. Для кожного кроку вказати функціональні залежності, порушення і декомпозицію.
+Проаналізувати схему `logistics` з лабораторної 2 на надлишковість і аномалії, записати функціональні залежності (ФЗ) кожної таблиці, визначити нормальну форму, усунути порушення і показати фінальну схему в 3НФ.
 
-## 2. Ненормалізована форма
+## 2. Вихідна схема (лабораторна 2)
 
-Схема лабораторної 2 вже є результатом проектування, тому почнемо з того, як накладна існує в документі постачання: один рядок на накладну, а позиції товарів - повторюваними групами. У даних лабораторної є до 2 позицій на накладну.
+Таблиці: `supplier`, `product`, `warehouse_location`, `supply_order`, `supply_item`, `inventory_stock`, `inventory_movement`. Ключі і обмеження описані в `docs/adr/schema.sql`.
 
-Таблиця `U0` (ненормалізована):
+### 2.1 Функціональні залежності та ключі
 
-| Група | Атрибути |
-|---|---|
-| Накладна | `order_number`, `supplier_id`, `company_name`, `supplier_address`, `supply_date`, `total_cost`, `status`, `batch_number` |
-| Позиція 1 | `sku_code_1`, `product_name_1`, `unit_1`, `location_code_1`, `zone_1`, `quantity_1`, `unit_price_1`, `expiry_date_1` |
-| Позиція 2 | `sku_code_2`, `product_name_2`, `unit_2`, `location_code_2`, `zone_2`, `quantity_2`, `unit_price_2`, `expiry_date_2` |
+| Таблиця | Кандидатні ключі | Функціональні залежності | Найвища НФ |
+|---|---|---|---|
+| `supplier` | `supplier_id`, `email` | `supplier_id → усі атрибути`; `email → усі атрибути` | BCNF |
+| `product` | `product_id`, `sku_code` | `product_id → усі`; `sku_code → усі` | BCNF |
+| `warehouse_location` | `location_id`, `location_code`, `(zone, shelf_number)` | `location_id → усі`; `location_code → усі`; `(zone, shelf_number) → location_id, location_code, max_capacity` | BCNF |
+| `supply_order` | `order_id`, `order_number` | `order_id → усі`; `order_number → усі`; `order_id → total_cost` (похідний, див. розд. 3.2) | BCNF |
+| `supply_item` | `(order_id, product_id)` | `(order_id, product_id) → location_id, quantity, unit_price, batch_number, expiry_date`; `order_id → batch_number` (часткова, за правилом партій) | 1НФ (2НФ порушено) |
+| `inventory_stock` | `(product_id, location_id)` | `(product_id, location_id) → quantity` | BCNF |
+| `inventory_movement` | `movement_id` | `movement_id → усі` | BCNF |
 
-Для накладних з однією позицією група позиції 2 порожня (NULL).
+Після виправлення (розд. 5) `supply_item` буде в 3НФ, `supply_order` - у BCNF з `batch_number`.
 
-Порушення вже в цій формі: повторювана група позицій (`*_1`, `*_2`) - це порушення 1НФ.
+Транзитивну залежність `batch_number → expiry_date` ми перевірили: вона не виконується. Партія `P-2026-0101` містить товари з різними термінами (NULL для SKU-UTP-5E і 2027-12-31 для SKU-RJ45-100), тому `expiry_date` належить парі «партія-товар», а не самій партії.
 
-## 3. Функціональні залежності U0
+### 2.2 Перевірка нормальних форм початкової схеми
 
-Для однієї позиції ключ таблиці - `(order_number, sku_code)`. Групи `*_2` мають ті самі залежності, що й `*_1`.
+| Таблиця | 1НФ | 2НФ | 3НФ |
+|---|---|---|---|
+| `supplier`, `product`, `warehouse_location`, `inventory_stock`, `inventory_movement` | так | так | так |
+| `supply_order` | так | так | так |
+| `supply_item` | так | **ні** | так |
 
-| Залежність | Тип |
-|---|---|
-| `order_number → supplier_id, company_name, supplier_address, supply_date, total_cost, status, batch_number` | часткова (від частини ключа) |
-| `sku_code → product_name, unit` | часткова (від частини ключа) |
-| `(order_number, sku_code) → location_code, quantity, unit_price, expiry_date` | повна |
-| `location_code → zone` | транзитивна: `(order_number, sku_code) → location_code → zone` |
-| `supplier_id → company_name, supplier_address` | транзитивна: `order_number → supplier_id → company_name` |
+Найвища нормальна форма початкової схеми - **1НФ**: через порушення 2НФ у `supply_item` схема не досягає 2НФ.
 
-## 4. Крок 1: 1НФ
+## 3. Аналіз порушень
 
-**Порушення:** повторювані групи позицій. Атрибути `sku_code_1`, `sku_code_2` і т.д. є однією і тією самою властивістю, записаною кілька разів.
+### 3.1 Порушення 2НФ: `supply_item.batch_number`
 
-**Рішення:** винести кожну позицію в окремий рядок.
+Ключ `supply_item` складений: `(order_id, product_id)`. Ми бачимо, що `batch_number` визначається лише `order_id`, тобто частиною ключа. Це часткова залежність.
 
-Таблиця `R1` (1НФ):
+Умова: партія постачання однакова для всієї накладної (одна поставка - один номер партії). Це правило ми обрали для лабораторної. За ним у кожній з 5 накладних усі позиції мають однакову партію: `lab5_normalization.sql`, блок 5, повертає 0 рядків.
 
-`R1(order_number, sku_code, supplier_id, company_name, supplier_address, supply_date, total_cost, status, batch_number, product_name, unit, location_code, zone, quantity, unit_price, expiry_date)`
+Аномалії, які з цього випливають:
+- **Оновлення:** якщо номер партії накладної змінився, його треба оновити в кожній позиції; пропуск одного рядка дає суперечливі дані.
+- **Вставка:** неможливо зареєструвати партію накладної без позицій, бо `batch_number` існує лише в позиції.
+- **Надмірність:** один номер партії повторюється в кожній позиції накладної.
 
-Ключ: `(order_number, sku_code)`. У даних 7 рядків (2 + 2 + 1 + 1 + 1).
+### 3.2 Не порушення: `supply_order.total_cost`
 
-Після цього всі атрибути атомарні, повторюваних груп немає. Таблиця в 1НФ, але не в 2НФ і не в 3НФ (залежності з розд. 3 лишаються).
+`total_cost` дорівнює сумі `quantity * unit_price` позицій. Це похідна колонка, а не порушення нормальної форми: ФЗ між неключовими атрибутами однієї таблиці немає. Це денормалізація, зафіксована в `spec.md` (розд. 4, пункт 3). Коректність перевіряє блок 4 `lab5_normalization.sql` (0 рядків).
 
-## 5. Крок 2: 2НФ
+### 3.3 Не порушення: інші таблиці
 
-**Порушення:** часткові залежності від частини складеного ключа `(order_number, sku_code)`:
-- `order_number → supplier_id, company_name, supplier_address, supply_date, total_cost, status, batch_number`;
-- `sku_code → product_name, unit`.
+Для кожної іншої таблиці всі детермінанти є надключами, тому порушень 2НФ, 3НФ і НФБК немає.
 
-Аномалії:
-- **Оновлення:** назва товару зберігається в кожній накладній, де він є; зміна назви вимагає оновлення всіх таких рядків.
-- **Вставка:** неможливо додати товар, якого ще немає в накладній.
-- **Видалення:** видалення останньої накладної з товаром стирає інформацію про сам товар.
-- **Надмірність:** `batch_number` і `total_cost` повторюються в кожній позиції накладної.
+## 4. Нормалізація
 
-**Рішення:** винести часткові залежності в окремі таблиці.
+### 4.1 Крок 1: 1НФ
 
-- `ORDER(order_number PK, supplier_id, company_name, supplier_address, supply_date, total_cost, status, batch_number)`
-- `PRODUCT(sku_code PK, product_name, unit)`
-- `ORDER_ITEM(order_number, sku_code PK, location_code, zone, quantity, unit_price, expiry_date)`, ключ `(order_number, sku_code)`
+Вихідна схема вже в 1НФ: усі атрибути атомарні, повторюваних груп немає (кожна позиція накладної - окремий рядок). Таблиці на цьому етапі з ключами:
+- `supply_order(order_id PK, order_number UK, supplier_id FK, supply_date, total_cost, status)`
+- `supply_item(order_id, product_id PK складений, location_id FK, quantity, unit_price, batch_number, expiry_date)`
+- решта таблиць (`supplier`, `product`, `warehouse_location`, `inventory_stock`, `inventory_movement`) з ключами за розд. 2.1
 
-Після декомпозиції кожен неключовий атрибут залежить від повного ключа своєї таблиці. Таблиці `ORDER` і `ORDER_ITEM` ще містять транзитивні залежності, які розв'язуємо на кроці 3.
+Змін на цьому кроці не потрібно.
 
-## 6. Крок 3: 3НФ
+### 4.2 Крок 2: 2НФ - винесення `batch_number` у накладну
 
-**Порушення 1:** у `ORDER` є `supplier_id → company_name, supplier_address`. Атрибути постачальника залежать від `order_number` транзитивно через `supplier_id`.
+Порушення: `order_id → batch_number` (частина ключа `supply_item`).
 
-**Порушення 2:** у `ORDER_ITEM` є `location_code → zone`. Зона залежить від `(order_number, sku_code)` транзитивно через комірку.
+Рішення: перенести `batch_number` з `supply_item` у `supply_order`, де він визначається повним ключем `order_id`.
 
-**Рішення:** винести транзитивні залежності в окремі таблиці.
+Було:
+- `supply_order(order_id PK, order_number UK, supplier_id FK, supply_date, total_cost, status)`
+- `supply_item(order_id, product_id PK, location_id, quantity, unit_price, batch_number, expiry_date)`
 
-- `SUPPLIER(supplier_id PK, company_name, supplier_address)`
-- `ORDER(order_number PK, supplier_id FK, supply_date, total_cost, status, batch_number)`
-- `LOCATION(location_code PK, zone)`
-- `ORDER_ITEM(order_number FK, sku_code FK, location_code FK, quantity, unit_price, expiry_date)`, ключ `(order_number, sku_code)`
-- `PRODUCT(sku_code PK, product_name, unit)` - без змін
+Стало:
+- `supply_order(order_id PK, order_number UK, supplier_id FK, supply_date, total_cost, status, batch_number NOT NULL)`
+- `supply_item(order_id, product_id PK, location_id, quantity, unit_price, expiry_date)`
 
-Перевірка 3НФ: у кожній таблиці кожен неключовий атрибут залежить від ключа безпосередньо. Транзитивних залежностей немає.
-
-Перевірка НФБК: усі детермінанти є надключами (`order_number`, `supplier_id` у `SUPPLIER`, `sku_code`, `location_code`, складений ключ `ORDER_ITEM`). Отже, схема також у НФБК.
-
-## 7. Результат і зв'язок з лабораторною 2
-
-Після трьох кроків отримуємо таблиці, що відповідають схемі лабораторної 2:
-
-| Таблиця з кроку 3 | Таблиця лабораторної 2 | Відповідність |
-|---|---|---|
-| `SUPPLIER` | `supplier` | ті самі атрибути (у лабораторній 2 додатково `contact_person`, `phone`, `email`, які тут не показані) |
-| `PRODUCT` | `product` | ті самі атрибути |
-| `LOCATION` | `warehouse_location` | те саме, крім `max_capacity` і `shelf_number`, які тут не показані |
-| `ORDER` | `supply_order` | ті самі атрибути, у лабораторній 2 `batch_number` відсутній |
-| `ORDER_ITEM` | `supply_item` | ті самі атрибути, у лабораторній 2 є `batch_number` |
-
-Різниця: у лабораторній 2 `batch_number` стоїть у `supply_item`, а з кроку 2 випливає, що він визначається `order_number`. Це та сама часткова залежність 2НФ, тільки для `batch_number`. Тому фінальна схема переносить `batch_number` у `ORDER` (`supply_order`).
+`expiry_date` лишається в `supply_item`: він залежить від пари «партія-товар», тобто від рядка позиції.
 
 Зміни в таблицях (`ALTER TABLE`):
 ```sql
 ALTER TABLE supply_order ADD COLUMN batch_number VARCHAR(50);
-UPDATE supply_order o SET batch_number = (
-    SELECT DISTINCT i.batch_number FROM supply_item i WHERE i.order_id = o.order_id);
+UPDATE supply_order o
+SET batch_number = (
+    SELECT DISTINCT i.batch_number FROM supply_item i WHERE i.order_id = o.order_id
+);
 ALTER TABLE supply_order ALTER COLUMN batch_number SET NOT NULL;
 ALTER TABLE supply_item DROP COLUMN batch_number;
 ```
 
-Перед запуском перевіряється, що `SELECT order_id FROM supply_item GROUP BY order_id HAVING COUNT(DISTINCT batch_number) > 1` повертає 0 рядків. Уся міграція виконується в одній транзакції (`BEGIN` / `COMMIT`), скрипт `docs/lab5/migration_batch_to_order.sql`.
+Значення для `UPDATE` беремо з позицій накладних скалярним підзапитом (він повертає одне значення, бо в кожній накладній одна партія). Перед запуском ми перевіряємо, що запит `SELECT order_id FROM supply_item GROUP BY order_id HAVING COUNT(DISTINCT batch_number) > 1` повертає 0 рядків, тобто в кожній накладній одна партія. Усю міграцію ми виконуємо в одній транзакції (`BEGIN` / `COMMIT`), скрипт `docs/lab5/migration_batch_to_order.sql`.
 
-Фінальна схема змінених таблиць:
+### 4.3 Крок 3: 3НФ
+
+Після кроку 2 транзитивних залежностей немає: жоден неключовий атрибут не визначає інший неключовий атрибут. Додаткової декомпозиції не потрібно.
+
+### 4.4 Перевірка НФБК
+
+Усі детермінанти в усіх таблицях є надключами. Отже, фінальна схема також у НФБК.
+
+## 5. Фінальна схема
+
+Змінені таблиці (повний скрипт з DROP, CREATE і даними: `docs/lab5/lab5_schema_3nf.sql`):
 
 ```sql
 CREATE TABLE supply_order (
@@ -137,22 +134,26 @@ CREATE TABLE supply_item (
 );
 ```
 
-`total_cost` залишається в `ORDER` як похідна колонка. Це денормалізація, а не порушення нормальної форми (ФЗ між неключовими атрибутами немає). Коректність перевіряє блок 4 `lab5_normalization.sql`.
+Інші таблиці фінальної схеми (`supplier`, `product`, `warehouse_location`, `inventory_stock`, `inventory_movement`) без змін, їх `CREATE TABLE` є в `lab5_schema_3nf.sql`.
 
-## 8. Перевірка виконання
+Діаграма фінальної схеми: `docs/lab5/diagram_3nf.png`.
 
-- [x] Описано ненормалізовану форму і порушення 1НФ.
-- [x] Визначено ФЗ для ненормалізованої таблиці.
-- [x] Крок 1: 1НФ (винесено позиції в рядки).
-- [x] Крок 2: 2НФ (винесено часткові залежності від `order_number` і `sku_code`).
-- [x] Крок 3: 3НФ (винесено транзитивні залежності через `supplier_id` і `location_code`).
-- [x] Перевірено НФБК для фінальних таблиць.
-- [x] Наведено `ALTER TABLE` і фінальні `CREATE TABLE`.
-- [ ] Скрипти виконано в PostgreSQL (psql у системі не знайдено; перевірити в pgAdmin).
-- [ ] Діаграму `diagram.mmd` оновлено і експортовано в PNG/PDF.
+## 6. Перевірка виконання
 
-## 9. Висновки
+- [x] Визначено ФЗ для всіх 7 таблиць схеми лабораторної 2 (розд. 2.1).
+- [x] Визначено найвищу НФ початкової схеми (1НФ) і причину (порушення 2НФ у `supply_item`).
+- [x] Показано покроковий перехід 1НФ → 2НФ → 3НФ → НФБК (розд. 4).
+- [x] Наведено `ALTER TABLE` для змінених таблиць і фінальні `CREATE TABLE` (розд. 4.2, 5).
+- [x] Скрипти виконано на PostgreSQL-сумісному движку PGlite (WebAssembly), без помилок: `schema.sql` → `lab5_normalization.sql` → `migration_batch_to_order.sql`; окремо `lab5_schema_3nf.sql`.
+- [x] Результати перевірок ФЗ на даних: блоки 1-5, 7-9 повернули 0 рядків; блок 6 повернув 2 партії (`P-2026-0101`, `P-2026-0202`), де термін залежить від товару.
+- [x] Після міграції у кожній з 5 накладних є партія, у `supply_item` колонки `batch_number` немає, порожніх значень немає.
+- [x] Діаграму `diagram_3nf.mmd` експортовано в `diagram_3nf.png`.
+- [ ] Повторно перевірити скрипти в pgAdmin (psql у системі немає; PGlite не є повним PostgreSQL).
 
-- Ненормалізована накладна має порушення 1НФ (повторювані групи позицій), 2НФ (часткові залежності від `order_number` і `sku_code`) і 3НФ (транзитивні залежності через `supplier_id` і `location_code`).
-- Після трьох кроків отримано таблиці, що відповідають схемі лабораторної 2. Фінальна схема в 3НФ і НФБК.
-- Єдина зміна відносно лабораторної 2: `batch_number` переноситься з `supply_item` у `supply_order`. Це залежить від правила «одна партія на накладну», яке треба підтвердити. Якщо правило інше, перенесення не потрібне, і ця зміна не застосовується.
+## 7. Висновки
+
+- Схема лабораторної 2 має одне порушення 2НФ: `batch_number` у `supply_item` залежить лише від `order_id` (за правилом партій «одна партія на накладну»).
+- Порушення усунено винесенням `batch_number` у `supply_order`. Після цього схема в 3НФ і НФБК.
+- `total_cost` залишено як свідому денормалізацію, зафіксовану і перевірену запитом.
+- `expiry_date` лишається в `supply_item`, бо залежить від пари «партія-товар», а не від самої партії.
+- Правило «одна партія на накладну» ми обрали для цієї лабораторної. Якщо в реальному складі партія може бути різною для товарів однієї накладної, порушення немає, і схема вже в 3НФ.
