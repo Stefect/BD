@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model inventory_movement {
   movement_id                                                                Int                 @id @default(autoincrement())
   movement_type                                                              movement_kind
@@ -26,7 +26,7 @@ model inventory_movement {
   @@index([product_id, movement_date], map: "idx_inventory_movement_product_date")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model inventory_stock {
   product_id         Int
   location_id        Int
@@ -38,7 +38,7 @@ model inventory_stock {
   @@index([location_id], map: "idx_inventory_stock_location")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model product {
   product_id         Int                  @id @default(autoincrement())
   sku_code           String               @unique @db.VarChar(50)
@@ -66,7 +66,7 @@ model product_category {
   @@index([name], map: "idx_product_category_name")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model supplier {
   supplier_id    Int            @id @default(autoincrement())
   company_name   String         @db.VarChar(100)
@@ -79,7 +79,7 @@ model supplier {
   supply_order   supply_order[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model supply_item {
   order_id           Int
   product_id         Int
@@ -96,7 +96,7 @@ model supply_item {
   @@index([product_id], map: "idx_supply_item_product")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model supply_order {
   order_id     Int           @id @default(autoincrement())
   order_number String        @unique @db.VarChar(50)
@@ -111,7 +111,7 @@ model supply_order {
   @@index([supplier_id], map: "idx_supply_order_supplier")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Ця таблиця містить CHECK-обмеження і потребує додаткового налаштування для міграцій. Див. https://pris.ly/d/check-constraints
 model warehouse_location {
   location_id                                                                Int                  @id @default(autoincrement())
   location_code                                                              String               @unique @db.VarChar(50)
