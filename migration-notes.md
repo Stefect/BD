@@ -66,10 +66,10 @@ Database schema is up to date!
 Prisma SQL:
 
 ```sql
--- AlterTable
+-- Зміна таблиці
 ALTER TABLE "product" ADD COLUMN "notes" TEXT;
 
--- Data migration: copy legacy description into new notes column (expand step)
+-- Міграція даних: копіюємо старий description у нову колонку notes (крок expand)
 UPDATE "product" SET "notes" = "description" WHERE "notes" IS NULL;
 ```
 

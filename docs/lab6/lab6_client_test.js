@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // 1. Create a product category (new table from migration add-product-category)
+  // 1. Створюємо категорію товару (нова таблиця з міграції add-product-category)
   const category = await prisma.product_category.create({
     data: {
       name: 'Кабелі та конектори',
@@ -12,7 +12,7 @@ async function main() {
   });
   console.log('Created category:', category);
 
-  // 2. Update an existing product: assign category, set reorder_quantity, keep notes
+  // 2. Оновлюємо наявний товар: призначаємо категорію, встановлюємо reorder_quantity, зберігаємо notes
   const updated = await prisma.product.update({
     where: { sku_code: 'SKU-UTP-5E' },
     data: {
@@ -29,14 +29,14 @@ async function main() {
     category: updated.product_category?.name,
   });
 
-  // 3. Read products with their category (relation check)
+  // 3. Читаємо товари з їхньою категорією (перевірка зв'язку)
   const products = await prisma.product.findMany({
     where: { category_id: category.category_id },
     include: { product_category: true },
   });
   console.log('Products in category:', products.map((p) => `${p.sku_code} (${p.product_category?.name})`));
 
-  // 4. Cleanup demo row to keep DB tidy (optional)
+  // 4. Очищаємо демонстраційний рядок, щоб не засмічувати БД (необов'язково)
   await prisma.product.update({
     where: { sku_code: 'SKU-UTP-5E' },
     data: { category_id: null, reorder_quantity: 0 },
