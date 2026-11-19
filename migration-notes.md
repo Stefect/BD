@@ -236,6 +236,13 @@ Cleanup done.
 - **Міграція даних:** окрім DDL, міграція 1 містить `UPDATE` для backfill.
 - **Базова таблиця версій:** Prisma веде `_prisma_migrations` (аналог
   `schema_migrations` з лекції 9) з версією, checksum і часом виконання.
+- **Незмінність міграцій:** файли `migration.sql` не редагуються після застосування,
+  бо будь-яка зміна (навіть коментаря) змінює checksum і Prisma вважає міграцію
+  `modified after it was applied`. Тому стандартні англомовні коментарі Prisma
+  у файлах `migration.sql` залишено без змін; переклад виконано у цьому звіті.
+- **Міграція 4** створена вручну (папка з timestamp і `migration.sql`), оскільки
+  `prisma migrate dev` у неінтерактивному режимі зупиняється на підтвердженні
+  видалення колонки з даними. SQL повністю відповідає зміні схеми Prisma.
 
 ## 7. Файли, що додаються до Git
 
@@ -247,7 +254,24 @@ Cleanup done.
 
 `.env` не комітиться (містить пароль БД).
 
-## 8. Висновки
+## 8. Чек-лист відповідності вимогам лабораторної
+
+- [x] Ініціалізація Prisma у папці проєкту (`npm init`, `npm install prisma --save-dev`, `npx prisma init --datasource-provider postgresql`).
+- [x] `DATABASE_URL` вказує на існуючу БД PostgreSQL (`logistics`).
+- [x] `npx prisma db pull` виконано, схема зчитана в `prisma/schema.prisma`.
+- [x] Початкова схема зафіксована в Git (baseline-міграція `0000_baseline`).
+- [x] Додано нову таблицю (`product_category`) зі зв'язком до `product`.
+- [x] Змінено наявну таблицю: додано `notes`, `reorder_quantity`, `category_id`.
+- [x] Видалено стовпець (`product.description`) окремою міграцією (contract-крок).
+- [x] Зміни ізольовані, кожна міграція має чітку назву.
+- [x] Міграції застосовані через `prisma migrate dev`, статус `up to date`.
+- [x] Папка `prisma/` (schema + migrations + lock) у Git.
+- [x] Перевірка клієнтом Prisma: вставка/читання в нових і змінених таблицях (`docs/lab6/lab6_client_test.js`).
+- [x] `migration-notes.md` з описом кожної міграції і фрагментами до/після.
+- [x] Використано матеріали лекції 9: безпечні/небезпечні ALTER, версіонування, незмінність, транзакційний DDL, expand and contract, data migration, roll forward.
+- [ ] Повторна перевірка в pgAdmin/psql не виконувалась (середовище без psql у PATH; використано Prisma Client).
+
+## 9. Висновки
 
 - Підключено Prisma ORM до існуючої БД `logistics` через `db pull`.
 - Створено baseline-міграцію без втрати даних (`migrate resolve --applied`).
