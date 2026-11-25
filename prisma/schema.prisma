@@ -43,25 +43,25 @@ model product {
   product_id         Int                  @id @default(autoincrement())
   sku_code           String               @unique @db.VarChar(50)
   name               String               @db.VarChar(100)
-  notes              String?
   unit               unit_type            @default(piece)
   min_stock_level    Int                  @default(0)
-  reorder_quantity   Int                  @default(0)
+  notes              String?
   category_id        Int?
-  product_category   product_category?    @relation(fields: [category_id], references: [category_id], onDelete: SetNull, onUpdate: NoAction)
+  reorder_quantity   Int                  @default(0)
   inventory_movement inventory_movement[]
   inventory_stock    inventory_stock[]
+  product_category   product_category?    @relation(fields: [category_id], references: [category_id], onUpdate: NoAction)
   supply_item        supply_item[]
 
   @@index([category_id], map: "idx_product_category")
 }
 
 model product_category {
-  category_id   Int       @id @default(autoincrement())
-  name          String    @unique @db.VarChar(100)
-  description   String?
-  created_at    DateTime  @default(now()) @db.Timestamp(6)
-  product       product[]
+  category_id Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  product     product[]
 
   @@index([name], map: "idx_product_category_name")
 }
