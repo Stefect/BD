@@ -244,6 +244,17 @@ Cleanup done.
   `prisma migrate dev` у неінтерактивному режимі зупиняється на підтвердженні
   видалення колонки з даними. SQL повністю відповідає зміні схеми Prisma.
 
+## 6.1 Перевірка через psql
+
+Запуск (повний шлях до `psql.exe`, оскільки у PATH його не було):
+
+```bash
+"C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d logistics -c "\d product"
+"C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d logistics -c "\dt"
+```
+
+Вивід підтвердив: колонки `notes`, `category_id`, `reorder_quantity`; відсутність `description`; наявність таблиці `product_category`; FK `product_category_id_fkey ... ON DELETE SET NULL`.
+
 ## 7. Файли, що додаються до Git
 
 - `prisma/schema.prisma`
@@ -269,7 +280,7 @@ Cleanup done.
 - [x] Перевірка клієнтом Prisma: вставка/читання в нових і змінених таблицях (`docs/lab6/lab6_client_test.js`).
 - [x] `migration-notes.md` з описом кожної міграції і фрагментами до/після.
 - [x] Використано матеріали лекції 9: безпечні/небезпечні ALTER, версіонування, незмінність, транзакційний DDL, expand and contract, data migration, roll forward.
-- [ ] Повторна перевірка в pgAdmin/psql не виконувалась (середовище без psql у PATH; використано Prisma Client).
+- [x] Повторна перевірка виконана через psql (`\d product`, `\dt`): фінальна схема і таблиця `product_category` підтверджені.
 
 ## 9. Висновки
 
